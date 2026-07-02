@@ -36,8 +36,6 @@ function skullMesh() {
   h2.position.x = 8;
   h2.rotation.z = -0.5;
   g.add(head, jaw, e1, e2, h1, h2);
-  const light = new THREE.PointLight(0xff3300, 500, 200, 1.8);
-  g.add(light);
   return g;
 }
 

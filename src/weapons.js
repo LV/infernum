@@ -200,16 +200,19 @@ const PROJ_STYLE = {
   fireball: { color: 0xff7711, size: 9, light: 1400, trail: { r: 1, g: 0.4, b: 0.05 } },
 };
 
+// shared geometry/material per type -- spawning must not allocate GPU resources
+for (const style of Object.values(PROJ_STYLE)) {
+  style.geo = new THREE.SphereGeometry(style.size, 8, 8);
+  style.mat = new THREE.MeshBasicMaterial({ color: style.color });
+}
+
 export function spawnProjectile(game, def) {
   const style = PROJ_STYLE[def.type];
-  const geo = new THREE.SphereGeometry(style.size, 8, 8);
-  const mat = new THREE.MeshBasicMaterial({ color: style.color });
-  const mesh = new THREE.Mesh(geo, mat);
+  const mesh = new THREE.Mesh(style.geo, style.mat);
   mesh.position.set(def.pos.x, def.pos.y, def.pos.z);
-  const light = new THREE.PointLight(style.color, style.light, 500, 1.8);
-  mesh.add(light);
   game.scene.add(mesh);
-  game.projectiles.push({ ...def, mesh, life: 10, style });
+  const lightSlot = game.effects.acquireProjLight(style.color, style.light);
+  game.projectiles.push({ ...def, mesh, lightSlot, life: 10, style });
 }
 
 export function updateProjectiles(game, dt) {
@@ -253,6 +256,7 @@ export function updateProjectiles(game, dt) {
     pr.pos.y += pr.vel.y * dt;
     pr.pos.z += pr.vel.z * dt;
     pr.mesh.position.set(pr.pos.x, pr.pos.y, pr.pos.z);
+    if (pr.lightSlot) pr.lightSlot.light.position.set(pr.pos.x, pr.pos.y, pr.pos.z);
 
     // exhaust trail
     if (pr.style.trail && Math.random() < 0.85) {
@@ -292,9 +296,8 @@ function detonate(game, pr, point, hitEnemy, hitPlayer, dir) {
 
 function removeProjectile(game, i) {
   const pr = game.projectiles[i];
-  game.scene.remove(pr.mesh);
-  pr.mesh.geometry.dispose();
-  pr.mesh.material.dispose();
+  game.scene.remove(pr.mesh); // geometry/material are shared, never disposed
+  game.effects.releaseProjLight(pr.lightSlot);
   game.projectiles.splice(i, 1);
 }
 

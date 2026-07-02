@@ -63,12 +63,21 @@ export class Effects {
     scene.add(this.points);
 
     // ---- pooled flash lights ----
+    // Lights stay in the scene permanently (intensity 0 when idle): adding or
+    // removing a light forces three.js to recompile every shader = frame hitch.
     this.lights = [];
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < 5; i++) {
       const l = new THREE.PointLight(0xff6622, 0, 600, 1.6);
-      l.visible = false;
       scene.add(l);
       this.lights.push({ light: l, life: 0, maxLife: 1, intensity: 0 });
+    }
+
+    // ---- pooled projectile lights (same reason) ----
+    this.projLights = [];
+    for (let i = 0; i < 6; i++) {
+      const l = new THREE.PointLight(0xffffff, 0, 500, 1.8);
+      scene.add(l);
+      this.projLights.push({ light: l, free: true });
     }
 
     // ---- fading trails (railgun) ----
@@ -128,9 +137,23 @@ export class Effects {
     slot.light.position.set(pos.x, pos.y, pos.z);
     slot.light.color.set(color);
     slot.light.distance = dist;
-    slot.light.visible = true;
     slot.intensity = intensity;
     slot.maxLife = slot.life = life;
+  }
+
+  acquireProjLight(color, intensity) {
+    const slot = this.projLights.find(s => s.free);
+    if (!slot) return null;
+    slot.free = false;
+    slot.light.color.set(color);
+    slot.light.intensity = intensity;
+    return slot;
+  }
+
+  releaseProjLight(slot) {
+    if (!slot) return;
+    slot.light.intensity = 0;
+    slot.free = true;
   }
 
   // ---------------- canned effects ----------------
@@ -264,7 +287,7 @@ export class Effects {
     for (const l of this.lights) {
       if (l.life <= 0) continue;
       l.life -= dt;
-      if (l.life <= 0) { l.light.visible = false; l.light.intensity = 0; continue; }
+      if (l.life <= 0) { l.light.intensity = 0; continue; }
       l.light.intensity = l.intensity * (l.life / l.maxLife);
     }
 
