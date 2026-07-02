@@ -159,7 +159,7 @@ export class Player {
     const sin = Math.sin(this.yaw), cos = Math.cos(this.yaw);
     // forward is -Z rotated by yaw
     let wishX = -sin * fw + cos * side;
-    let wishZ = -cos * fw + sin * side;
+    let wishZ = -cos * fw - sin * side;
     const wl = Math.hypot(wishX, wishZ);
     if (wl > 0) { wishX /= wl; wishZ /= wl; }
 
