@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>INFERNUM</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #000; }
+  body { font-family: 'Impact', 'Arial Black', sans-serif; user-select: none; }
+  #game-canvas { position: absolute; inset: 0; display: block; }
+
+  /* ---------- HUD ---------- */
+  #hud { position: absolute; inset: 0; pointer-events: none; display: none; }
+  .hud-visible #hud { display: block; }
+
+  #crosshair {
+    position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    width: 24px; height: 24px; opacity: 0.9;
+  }
+  #crosshair::before, #crosshair::after {
+    content: ''; position: absolute; background: #ffb080;
+    box-shadow: 0 0 4px #ff4400;
+  }
+  #crosshair::before { left: 50%; top: 0; width: 2px; height: 100%; transform: translateX(-50%); }
+  #crosshair::after { top: 50%; left: 0; height: 2px; width: 100%; transform: translateY(-50%); }
+  #crosshair.hidden { display: none; }
+
+  #hitmarker {
+    position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%) rotate(45deg);
+    width: 30px; height: 30px; opacity: 0; transition: opacity 0.2s;
+  }
+  #hitmarker::before, #hitmarker::after { content:''; position: absolute; background: #ff2200; }
+  #hitmarker::before { left: 50%; top: 0; width: 3px; height: 100%; transform: translateX(-50%); }
+  #hitmarker::after { top: 50%; left: 0; height: 3px; width: 100%; transform: translateY(-50%); }
+
+  .hud-num { text-shadow: 0 0 12px rgba(255, 60, 0, 0.9), 2px 2px 2px #000; letter-spacing: 2px; }
+
+  #status-bar {
+    position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%);
+    display: flex; gap: 48px; align-items: flex-end;
+  }
+  #health-block, #armor-block, #ammo-block { text-align: center; }
+  .hud-label { font-size: 13px; color: #b06040; letter-spacing: 4px; }
+  #health-val { font-size: 52px; color: #ffcc99; }
+  #health-val.low { color: #ff2200; animation: pulse 0.6s infinite; }
+  #armor-val { font-size: 52px; color: #ffaa33; }
+  #ammo-val  { font-size: 52px; color: #99ccff; }
+  @keyframes pulse { 50% { opacity: 0.4; } }
+
+  #frags {
+    position: absolute; top: 20px; left: 24px;
+    font-size: 30px; color: #ff8855;
+  }
+  #timer {
+    position: absolute; top: 20px; right: 24px;
+    font-size: 30px; color: #aa6644;
+  }
+
+  #weapon-bar {
+    position: absolute; right: 24px; bottom: 24px; display: flex; flex-direction: column; gap: 4px;
+  }
+  .wslot {
+    font-size: 15px; padding: 3px 10px; color: #553322; border: 1px solid #331a11;
+    background: rgba(10, 2, 0, 0.5); letter-spacing: 1px; font-family: monospace;
+  }
+  .wslot.owned { color: #cc8866; border-color: #663322; }
+  .wslot.current { color: #ffddaa; border-color: #ff6622; background: rgba(80, 15, 0, 0.6);
+    box-shadow: 0 0 10px rgba(255, 80, 0, 0.4); }
+
+  #messages {
+    position: absolute; top: 15%; left: 50%; transform: translateX(-50%);
+    text-align: center; width: 100%;
+  }
+  .msg { font-size: 22px; color: #ffcc88; text-shadow: 0 0 10px #f40, 1px 1px 2px #000;
+    letter-spacing: 3px; animation: msgfade 2.5s forwards; }
+  @keyframes msgfade { 0% {opacity: 0;} 10% {opacity: 1;} 70% {opacity: 1;} 100% {opacity: 0;} }
+
+  #damage-vignette {
+    position: absolute; inset: 0; opacity: 0; pointer-events: none;
+    background: radial-gradient(ellipse at center, transparent 40%, rgba(200, 0, 0, 0.55) 100%);
+  }
+  #lava-vignette {
+    position: absolute; inset: 0; opacity: 0; pointer-events: none;
+    background: radial-gradient(ellipse at center, rgba(255,100,0,0.15) 20%, rgba(255, 60, 0, 0.5) 100%);
+  }
+  #pickup-flash {
+    position: absolute; inset: 0; opacity: 0; pointer-events: none;
+    background: rgba(255, 220, 120, 0.12);
+  }
+
+  /* ---------- Screens ---------- */
+  .screen {
+    position: absolute; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; z-index: 10;
+    background: radial-gradient(ellipse at 50% 120%, rgba(120, 10, 0, 0.85), rgba(0, 0, 0, 0.92) 70%);
+    cursor: pointer;
+  }
+  #title {
+    font-size: 110px; letter-spacing: 22px; color: #ff3300; margin-left: 22px;
+    text-shadow: 0 0 30px #f30, 0 0 80px #800, 3px 3px 0 #200;
+    animation: flicker 4s infinite;
+  }
+  @keyframes flicker {
+    0%, 100% { text-shadow: 0 0 30px #f30, 0 0 80px #800, 3px 3px 0 #200; }
+    92% { text-shadow: 0 0 30px #f30, 0 0 80px #800, 3px 3px 0 #200; }
+    93% { text-shadow: 0 0 8px #810, 3px 3px 0 #200; }
+    94% { text-shadow: 0 0 30px #f30, 0 0 80px #800, 3px 3px 0 #200; }
+    97% { text-shadow: 0 0 8px #810, 3px 3px 0 #200; }
+  }
+  .subtitle { font-size: 18px; color: #995533; letter-spacing: 8px; margin-top: 4px; }
+  .prompt { font-size: 24px; color: #ffbb77; letter-spacing: 4px; margin-top: 60px;
+    animation: pulse 1.4s infinite; }
+  .controls {
+    margin-top: 40px; font-family: monospace; font-size: 14px; color: #774433;
+    line-height: 1.8; text-align: center; letter-spacing: 1px;
+  }
+  .controls b { color: #cc7744; }
+  #death-screen { display: none; background: radial-gradient(ellipse at center, rgba(150, 0, 0, 0.5), rgba(20, 0, 0, 0.9)); }
+  #death-title { font-size: 80px; letter-spacing: 14px; color: #dd1100; text-shadow: 0 0 40px #900; }
+  #death-stats { font-size: 20px; color: #aa6644; margin-top: 20px; letter-spacing: 3px; }
+</style>
+</head>
+<body>
+  <canvas id="game-canvas"></canvas>
+
+  <div id="hud">
+    <div id="damage-vignette"></div>
+    <div id="lava-vignette"></div>
+    <div id="pickup-flash"></div>
+    <div id="crosshair"></div>
+    <div id="hitmarker"></div>
+    <div id="frags" class="hud-num">FRAGS 0</div>
+    <div id="timer" class="hud-num">0:00</div>
+    <div id="messages"></div>
+    <div id="status-bar">
+      <div id="armor-block"><div id="armor-val" class="hud-num">0</div><div class="hud-label">ARMOR</div></div>
+      <div id="health-block"><div id="health-val" class="hud-num">100</div><div class="hud-label">HEALTH</div></div>
+      <div id="ammo-block"><div id="ammo-val" class="hud-num">-</div><div class="hud-label">AMMO</div></div>
+    </div>
+    <div id="weapon-bar"></div>
+  </div>
+
+  <div id="menu-screen" class="screen">
+    <div id="title">INFERNUM</div>
+    <div class="subtitle">THERE IS NO ESCAPE FROM THE PIT</div>
+    <div class="prompt">CLICK TO DESCEND</div>
+    <div class="controls">
+      <b>WASD</b> move &nbsp; <b>MOUSE</b> aim &nbsp; <b>SPACE</b> jump (hold to bunnyhop) &nbsp; <b>LMB</b> fire<br/>
+      <b>1-7</b> / <b>WHEEL</b> switch weapon &nbsp; <b>ESC</b> release mouse<br/><br/>
+      strafe-jump to build speed &middot; rocket-jump to reach the heights &middot; the lava hungers
+    </div>
+  </div>
+
+  <div id="death-screen" class="screen">
+    <div id="death-title">YOU DIED</div>
+    <div id="death-stats"></div>
+    <div class="prompt">CLICK TO RISE AGAIN</div>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
