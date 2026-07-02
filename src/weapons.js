@@ -343,7 +343,7 @@ export function buildViewModel(wkey) {
   const w = WEAPONS[wkey];
   const g = new THREE.Group();
   g.scale.setScalar(0.55);
-  const metal = new THREE.MeshStandardMaterial({ color: 0x55555f, metalness: 0.7, roughness: 0.4 });
+  const metal = new THREE.MeshStandardMaterial({ color: 0x66666f, metalness: 0.15, roughness: 0.5 });
   const glow = new THREE.MeshBasicMaterial({ color: w.color });
 
   if (wkey === 'gauntlet') {
